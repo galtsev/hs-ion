@@ -1,6 +1,6 @@
 {-# Language OverloadedStrings #-}
 import qualified Data.ByteString.Lazy as LBS
-import Data.ByteString.Builder (toLazyByteString)
+import Data.ByteString.Builder (toLazyByteString, lazyByteString)
 import Data.Text (Text)
 import Test.Hspec
 
@@ -64,5 +64,23 @@ main = hspec $ do
                 ("1234567890123"::Text) `shouldEncodeTo` "\x8D\&1234567890123"
             it "varUInt length since length 14" $
                 ("12345678901234"::Text) `shouldEncodeTo` "\x8E\x8E\&12345678901234"
+
+        describe "lists" $ do
+            it "empty list" $
+                ([]::[Int]) `shouldEncodeTo` "\xB0"
+            it "single bool" $
+                [True] `shouldEncodeTo` "\xB1\x11"
+            it "two bools" $
+                [True, False] `shouldEncodeTo` "\xB2\x11\x10"
+            it "list of ints" $
+                ([2, 0x10E]::[Int]) `shouldEncodeTo` "\xB5\x21\x02\x22\x01\x0E"
+            it "long list" $
+                let
+                    lst:: [Int]
+                    lst = take 70 $ repeat 6
+                    bs = foldMap (const "\x21\x06") [1..70]
+                    expected = lazyByteString "\xBE\x01\x8C" <> bs
+                in
+                    lst `shouldEncodeTo` toLazyByteString expected
 
 

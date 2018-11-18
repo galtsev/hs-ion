@@ -4,7 +4,8 @@ import Prelude hiding (length)
 import Data.Word
 import Data.Bits
 import Data.ByteString (ByteString, pack, length)
-import Data.ByteString.Builder (Builder, word8, byteString, doubleBE)
+import qualified Data.ByteString.Lazy as LBS
+import Data.ByteString.Builder (Builder, word8, byteString, lazyByteString, doubleBE, toLazyByteString)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 
@@ -50,3 +51,12 @@ instance ToIon T.Text where
         where
             bs = T.encodeUtf8 v
             len = length bs
+
+instance ToIon a => ToIon [a] where
+    encode [] = word8 0xB0
+    encode v = if len<14
+            then word8 (0xB0 + fromIntegral len) <> bs
+            else word8 0xBE <> varUInt len <> bs
+        where
+            bs = foldMap encode $ v
+            len = fromIntegral . LBS.length . toLazyByteString $ bs
