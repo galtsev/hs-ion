@@ -55,6 +55,15 @@ main = hspec $ do
                 (345::Double) `shouldEncodeTo` "\x48\x40\x75\x90\x00\x00\x00\x00\x00"
             it "-801.5" $
                 (-801.5::Double) `shouldEncodeTo` "\x48\xC0\x89\x0C\x00\x00\x00\x00\x00"
+
+        describe "explicit symbol" $ do
+            it "one" $
+                Sym 1 `shouldEncodeTo` "\x71\x01"
+            it "0xFF to single byte" $
+                Sym 0xFF `shouldEncodeTo` "\x71\xFF"
+            it "0x100 to two bytes" $
+                Sym 0x100 `shouldEncodeTo` "\x72\x01\x00"
+
         describe "text" $ do
             it "short numbers" $
                 ("123"::Text) `shouldEncodeTo` "\x83\&123"
@@ -83,4 +92,17 @@ main = hspec $ do
                 in
                     lst `shouldEncodeTo` toLazyByteString expected
 
-
+        describe "annotation" $ do
+            it "single" $
+                Annotation [Sym 17] True `shouldEncodeTo` "\xE3\x81\x91\x11"
+            it "pair of annotations for list of int" $
+                let
+                    dat = [1, 2, 3, 4, 5]::[Int]
+                    datLen = 1 + 5*2
+                    anSyms = [Sym 6, Sym 403]
+                    annotLen = 1+2
+                    -- fullLen = 1 + annotLen + datLen
+                    fullLen = 14
+                    expected = toLazyByteString $ lazyByteString "\xEE\x8F\x83" <> foldMap (varUInt . fromEnum) anSyms <> encode dat
+                in
+                    Annotation anSyms dat `shouldEncodeTo` expected

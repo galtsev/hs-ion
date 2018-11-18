@@ -9,6 +9,8 @@ import Data.ByteString.Builder (Builder, word8, byteString, lazyByteString, doub
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 
+builderLen:: Builder -> Int
+builderLen = fromIntegral . LBS.length . toLazyByteString
 
 -- TODO: fail if value < 0
 varUInt:: Int -> Builder
@@ -59,4 +61,30 @@ instance ToIon a => ToIon [a] where
             else word8 0xBE <> varUInt len <> bs
         where
             bs = foldMap encode $ v
-            len = fromIntegral . LBS.length . toLazyByteString $ bs
+            len = builderLen bs
+
+newtype Symbol = Sym Int
+
+instance Enum Symbol where
+    toEnum i = Sym i
+    fromEnum (Sym v) = v
+
+instance ToIon Symbol where
+    encode (Sym v) = word8 (0x70 + fromIntegral len) <> byteString bs
+        where
+            bs = uintBS v
+            len = length bs
+
+data Annotation a = Annotation [Symbol] a
+
+instance ToIon a => ToIon (Annotation a) where
+    encode (Annotation syms body) = if len<14
+            then word8 (0xE0 + toEnum len) <> payload
+            else word8 0xEE <> varUInt len <> payload
+        where
+            bbs = encode body
+            an = foldMap (varUInt . fromEnum) syms
+            anLen = builderLen an
+            anLenBs = varUInt anLen
+            len = builderLen anLenBs + anLen + builderLen bbs
+            payload = anLenBs <> an <> bbs
