@@ -1,3 +1,4 @@
+{-# Language OverloadedStrings #-}
 module Data.Ion.Encoder where
 
 import Prelude hiding (length)
@@ -8,6 +9,9 @@ import qualified Data.ByteString.Lazy as LBS
 import Data.ByteString.Builder (Builder, word8, byteString, lazyByteString, doubleBE, toLazyByteString)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
+
+ivm:: ByteString
+ivm = "\xE0\x01\x00\xEA"
 
 builderLen:: Builder -> Int
 builderLen = fromIntegral . LBS.length . toLazyByteString
