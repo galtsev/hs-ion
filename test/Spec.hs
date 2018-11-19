@@ -106,3 +106,26 @@ main = hspec $ do
                     expected = toLazyByteString $ lazyByteString "\xEE\x8F\x83" <> foldMap (varUInt . fromEnum) anSyms <> encode dat
                 in
                     Annotation anSyms dat `shouldEncodeTo` expected
+
+        describe "IonList" $ do
+            it "empty IonList" $
+                IonList [] `shouldEncodeTo` "\xB0"
+            it "IonList of bool and int" $
+                IonList [proxy True, proxy (12::Int)] `shouldEncodeTo` "\xB3\x11\x21\x0C"
+
+        describe "Struct" $ do
+            it "empty Struct" $
+                Struct [] `shouldEncodeTo` "\xD0"
+
+            it "struct with int and bool" $
+                let
+                    f1 = (Sym 0x21, proxy (0x40::Int)) -- "\xA1\x21\x40"
+                    f2 = (Sym 0x22, proxy False) -- "\xA2\x10"
+                in
+                    Struct [f1, f2] `shouldEncodeTo` "\xD5\xA1\x21\x40\xA2\x10"
+
+            it "{$33: [True]}" $
+                let
+                    f1 = (Sym 0x21, proxy [True]) -- "\xA1\xB1\x11"
+                in
+                    Struct [f1] `shouldEncodeTo` "\xD3\xA1\xB1\x11"

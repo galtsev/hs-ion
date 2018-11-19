@@ -78,13 +78,34 @@ instance ToIon Symbol where
 data Annotation a = Annotation [Symbol] a
 
 instance ToIon a => ToIon (Annotation a) where
-    encode (Annotation syms body) = if len<14
-            then word8 (0xE0 + toEnum len) <> payload
-            else word8 0xEE <> varUInt len <> payload
+    encode (Annotation syms body) = withLen 0xE0 payload
         where
-            bbs = encode body
             an = foldMap (varUInt . fromEnum) syms
-            anLen = builderLen an
-            anLenBs = varUInt anLen
-            len = builderLen anLenBs + anLen + builderLen bbs
-            payload = anLenBs <> an <> bbs
+            payload = varUInt (builderLen an) <> an <> encode body
+
+newtype IonProxy = Prox {runProxy:: Builder}
+
+instance ToIon IonProxy where
+    encode (Prox b) = b
+
+proxy:: ToIon a => a -> IonProxy
+proxy a = Prox (encode a)
+
+newtype Struct = Struct [(Symbol, IonProxy)]
+
+withLen:: Word8 -> Builder -> Builder
+withLen tag body = if len<14
+        then word8 (tag + toEnum len) <> body
+        else word8 (tag+0x0E) <> varUInt len <> body
+    where
+        len = builderLen body
+
+instance ToIon Struct where
+    encode (Struct items) = withLen 0xD0 $ foldMap fld items
+        where
+            fld (Sym k, prox) = varUInt k <> runProxy prox
+
+newtype IonList = IonList [IonProxy]
+
+instance ToIon IonList where
+    encode (IonList items) = withLen 0xB0 $ foldMap runProxy items
