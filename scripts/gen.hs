@@ -4,6 +4,7 @@ import qualified Data.ByteString.Lazy as LBS
 import Data.ByteString.Builder (Builder, toLazyByteString, byteString)
 import qualified Data.Text as T
 import Data.Ion.Encoder
+import qualified Data.Ion.SystemTable as ST
 
 
 -- cheap generator of pseudo-random ints
@@ -22,10 +23,26 @@ genText = ("hs"<>) . T.pack . show
 genPair:: Int -> IonList
 genPair v = IonList [proxy v, proxy . ("s-"<>) . T.pack . show $ v]
 
+genStruct:: Int -> Struct
+genStruct v = Struct [
+    (Sym 10, proxy v),
+    (Sym 12, proxy . ("str-"<>) . T.pack . show $ v),
+    (Sym 11, proxy (v<500::Bool))
+    ]
+
+buildStructs:: Builder
+buildStructs = byteString ivm <> encode symTable <> foldMap (encode . genStruct) (take 20 gen)
+    where
+        syms = ["qty", "flag", "name"]::[T.Text]
+        symTable = Annotation [ST.ion_symbol_table] $ Struct [(ST.symbols, proxy syms)]
+
+writeStructs:: IO ()
+writeStructs = LBS.writeFile "data.ion" $ toLazyByteString buildStructs
 
 main:: IO ()
 main =
-    dumpAll 
+    writeStructs
+    -- dumpAll 
         -- id
         -- genText
-        genPair
+        -- genPair
