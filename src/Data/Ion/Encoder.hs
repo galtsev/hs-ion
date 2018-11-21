@@ -28,11 +28,9 @@ tagged tag p = hdr >> p
             else w8 (tag + 14) >> putVarUInt len
 
 instance ToIon Int where
-    encode i = tagged tag $ putInt v
-        where
-            (tag, v) = if i>=0
-                then (0x20, i)
-                else (0x30, (-i))
+    encode i = if i>= 0
+        then tagged 0x20 $ putInt i
+        else tagged 0x30 $ putInt (-i)
 
 instance ToIon Bool where
     encode False = w8 0x10
@@ -47,7 +45,7 @@ instance ToIon T.Text where
     encode = tagged 0x80 . write . T.encodeUtf8
 
 instance ToIon a => ToIon [a] where
-    encode v = tagged 0xB0 $ mapM_ encode v
+    encode = tagged 0xB0 . mapM_ encode
 
 newtype Symbol = Sym Int
 
@@ -56,7 +54,7 @@ instance Enum Symbol where
     fromEnum (Sym v) = v
 
 instance ToIon Symbol where
-    encode (Sym v) = tagged 0x70 $ putInt v
+    encode = tagged 0x70 . putInt . fromEnum
 
 data Annotation a = Annotation [Symbol] a
 
@@ -76,7 +74,7 @@ instance ToIon IonProxy where
     encode = runProxy
 
 proxy:: ToIon a => a -> IonProxy
-proxy a = Prox (encode a)
+proxy = Prox . encode
 
 newtype Struct = Struct [(Symbol, IonProxy)]
 
