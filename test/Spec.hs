@@ -5,12 +5,13 @@ import Data.Text (Text)
 import Test.Hspec
 
 import Data.Ion.Encoder
+import Data.Ion.Put
 
 shouldEncodeTo:: ToIon a => a -> LBS.ByteString -> Expectation
-shouldEncodeTo v expected = (toLazyByteString . encode) v `shouldBe` expected
+shouldEncodeTo v expected = (toLazyByteString . runPut . encode) v `shouldBe` expected
 
 shouldVarUInt:: Int -> LBS.ByteString -> Expectation
-shouldVarUInt v expected = (toLazyByteString . varUInt) v `shouldBe` expected
+shouldVarUInt v expected = (toLazyByteString . runPut . putVarUInt) v `shouldBe` expected
 
 main :: IO ()
 main = hspec $ do
@@ -103,7 +104,8 @@ main = hspec $ do
                     annotLen = 1+2
                     -- fullLen = 1 + annotLen + datLen
                     fullLen = 14
-                    expected = toLazyByteString $ lazyByteString "\xEE\x8F\x83" <> foldMap (varUInt . fromEnum) anSyms <> encode dat
+                    -- expected = toLazyByteString $ lazyByteString "\xEE\x8F\x83" <> foldMap (varUInt . fromEnum) anSyms <> encode dat
+                    expected = toLazyByteString $ lazyByteString "\xEE\x8F\x83" <> foldMap (runPut . putVarUInt . fromEnum) anSyms <> runPut (encode dat)
                 in
                     Annotation anSyms dat `shouldEncodeTo` expected
 
