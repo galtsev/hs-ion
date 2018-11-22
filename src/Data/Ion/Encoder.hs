@@ -25,8 +25,8 @@ ivm = write "\xE0\x01\x00\xEA"
 class ToIon a where
     encode :: a -> Put ()
 
-intern:: Symbol -> Put Int
-intern (Symbol t) = do
+intern:: Text -> Put Int
+intern t = do
     st <- getState
     let (idx, nst) = SymT.intern t st
     putState nst
@@ -74,9 +74,9 @@ symToText :: Symbol -> Text
 symToText (Symbol t) = t
 
 instance ToIon Symbol where
-    encode = tagged 0x70 . (intern >=> putInt)
+    encode = tagged 0x70 . (intern . symToText >=> putInt)
 
-data Annotation a = Annotation [Symbol] a
+data Annotation a = Annotation [Text] a
 
 instance ToIon a => ToIon (Annotation a) where
     encode (Annotation syms body) = tagged 0xE0 payload
@@ -97,7 +97,7 @@ instance ToIon IonProxy where
 proxy:: ToIon a => a -> IonProxy
 proxy = Prox . encode
 
-newtype Struct = Struct [(Symbol, IonProxy)]
+newtype Struct = Struct [(Text, IonProxy)]
 
 
 instance ToIon Struct where

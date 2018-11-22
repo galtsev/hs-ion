@@ -111,12 +111,12 @@ main = hspec $ do
 
         describe "annotation" $ do
             it "single" $
-                Annotation [Symbol "one"] True `shouldEncodeTo` "\xE3\x81\x8B\x11"
+                Annotation ["one"] True `shouldEncodeTo` "\xE3\x81\x8B\x11"
             it "pair of annotations for list of int" $
                 let
                     dat = [1, 2, 3, 4, 5, 6]::[Int]
                     datLen = 1 + 6*2 -- 13
-                    anSyms = [Symbol "$10", Symbol "two"]
+                    anSyms = ["$10", "two"]
                     annotLen = 1+1 -- 2
                     -- fullLen = 1 + annotLen + datLen
                     fullLen = 1 + 2 + 13 -- 16
@@ -137,13 +137,13 @@ main = hspec $ do
 
             it "{one: 64, two: False}" $
                 let
-                    f1 = (Symbol "one", proxy (0x40::Int)) -- "\x8B\x21\x40"
-                    f2 = (Symbol "two", proxy False) -- "\x8C\x10"
+                    f1 = ("one", proxy (0x40::Int)) -- "\x8B\x21\x40"
+                    f2 = ("two", proxy False) -- "\x8C\x10"
                 in
                     Struct [f1, f2] `shouldEncodeTo` "\xD5\x8B\x21\x40\x8C\x10"
 
             it "{$10: [True]}" $
                 let
-                    f1 = (Symbol "$10", proxy [True]) -- "\x8A\xB1\x11"
+                    f1 = ("$10", proxy [True]) -- "\x8A\xB1\x11"
                 in
                     Struct [f1] `shouldEncodeTo` "\xD3\x8A\xB1\x11"
