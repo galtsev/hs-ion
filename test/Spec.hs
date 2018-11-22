@@ -7,7 +7,7 @@ import Test.Hspec
 import Data.Ion.Encoder
 import Data.Ion.Put (runPut, lbBuilder, putVarUInt)
 
-runP :: Put () -> Builder
+runP :: Put -> Builder
 runP p = let (_, lb, _) = runPut p () in lbBuilder lb
 
 shouldEncodeTo:: ToIon a => a -> LBS.ByteString -> Expectation

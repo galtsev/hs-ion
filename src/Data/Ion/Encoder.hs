@@ -13,16 +13,16 @@ import qualified Data.Text.Encoding as T
 import Data.Ion.Put hiding (Put)
 import qualified Data.Ion.Put as PutS
 
-type Put = PutS.Put ()
+type Put = PutS.Put () ()
 
-ivm:: Put ()
+ivm:: Put
 ivm = write "\xE0\x01\x00\xEA"
 
 
 class ToIon a where
-    encode :: a -> Put ()
+    encode :: a -> Put
 
-tagged:: Word8 -> Put () -> Put ()
+tagged:: Word8 -> Put -> Put
 tagged tag p = prefix hdr p
     where
         hdr len = if len<14
@@ -68,9 +68,9 @@ instance ToIon a => ToIon (Annotation a) where
             payload = prefix putVarUInt an >> encode body
 
 
-newtype IonProxy = Prox (Put ())
+newtype IonProxy = Prox Put
 
-runProxy:: IonProxy -> Put ()
+runProxy:: IonProxy -> Put
 runProxy (Prox p) = p
 
 instance ToIon IonProxy where
