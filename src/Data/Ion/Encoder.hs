@@ -10,7 +10,10 @@ import Data.ByteString.Builder (Builder, word8, byteString, lazyByteString, doub
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 
-import Data.Ion.Put
+import Data.Ion.Put hiding (Put)
+import qualified Data.Ion.Put as PutS
+
+type Put = PutS.Put ()
 
 ivm:: Put ()
 ivm = write "\xE0\x01\x00\xEA"
@@ -20,10 +23,9 @@ class ToIon a where
     encode :: a -> Put ()
 
 tagged:: Word8 -> Put () -> Put ()
-tagged tag p = hdr >> p
+tagged tag p = prefix hdr p
     where
-        len = getLen p
-        hdr = if len<14
+        hdr len = if len<14
             then w8 (tag + toEnum len)
             else w8 (tag + 14) >> putVarUInt len
 
@@ -62,7 +64,8 @@ instance ToIon a => ToIon (Annotation a) where
     encode (Annotation syms body) = tagged 0xE0 payload
         where
             an = mapM_ (putVarUInt . fromEnum) syms
-            payload = putVarUInt (getLen an) >> an >> encode body
+            -- payload = putVarUInt (getLen an) >> an >> encode body
+            payload = prefix putVarUInt an >> encode body
 
 
 newtype IonProxy = Prox (Put ())

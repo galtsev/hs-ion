@@ -1,17 +1,20 @@
 {-# Language OverloadedStrings #-}
 import qualified Data.ByteString.Lazy as LBS
-import Data.ByteString.Builder (toLazyByteString, lazyByteString)
+import Data.ByteString.Builder (Builder, toLazyByteString, lazyByteString)
 import Data.Text (Text)
 import Test.Hspec
 
 import Data.Ion.Encoder
-import Data.Ion.Put
+import Data.Ion.Put (runPut, lbBuilder, putVarUInt)
+
+runP :: Put () -> Builder
+runP p = let (_, lb, _) = runPut p () in lbBuilder lb
 
 shouldEncodeTo:: ToIon a => a -> LBS.ByteString -> Expectation
-shouldEncodeTo v expected = (toLazyByteString . runPut . encode) v `shouldBe` expected
+shouldEncodeTo v expected = (toLazyByteString . runP . encode) v `shouldBe` expected
 
 shouldVarUInt:: Int -> LBS.ByteString -> Expectation
-shouldVarUInt v expected = (toLazyByteString . runPut . putVarUInt) v `shouldBe` expected
+shouldVarUInt v expected = (toLazyByteString . runP . putVarUInt) v `shouldBe` expected
 
 main :: IO ()
 main = hspec $ do
@@ -105,7 +108,7 @@ main = hspec $ do
                     -- fullLen = 1 + annotLen + datLen
                     fullLen = 14
                     -- expected = toLazyByteString $ lazyByteString "\xEE\x8F\x83" <> foldMap (varUInt . fromEnum) anSyms <> encode dat
-                    expected = toLazyByteString $ lazyByteString "\xEE\x8F\x83" <> foldMap (runPut . putVarUInt . fromEnum) anSyms <> runPut (encode dat)
+                    expected = toLazyByteString $ lazyByteString "\xEE\x8F\x83" <> foldMap (runP . putVarUInt . fromEnum) anSyms <> runP (encode dat)
                 in
                     Annotation anSyms dat `shouldEncodeTo` expected
 

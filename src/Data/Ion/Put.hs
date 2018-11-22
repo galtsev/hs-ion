@@ -18,47 +18,67 @@ instance Monoid LenBuilder where
 lbLen :: LenBuilder -> Int
 lbLen (LenBuilder (_,len)) = len
 
-newtype Put a = Put (LenBuilder, a)
+lbBuilder :: LenBuilder -> Builder
+lbBuilder (LenBuilder (b,_)) = b
 
-runPut:: Put () -> Builder
-runPut (Put (LenBuilder (body, _), ())) = body
+newtype Put s a = Put (s -> (s, LenBuilder, a))
+
+runPut::Put s a -> s -> (s, LenBuilder, a)
+runPut (Put p) s = p s
 
 -- runPut:: Put a -> (Builder, a)
 -- runPut (Put x) = x
 
-instance Functor Put where
-    fmap f (Put (b, a)) = Put (b, f a)
+instance Functor (Put s) where
+    fmap f (Put g) = Put $ \s -> 
+        let (s1, b, a) = g s in (s1, b, f a)
 
-instance Applicative Put where
-    pure v  = Put (mempty, v)
-    Put (fb, f) <*> Put (vb, v) = Put (fb <> vb, f v)
-
-instance Monad Put where
-    Put (ba, a) >>= f =
+instance Applicative (Put s) where
+    pure v  = Put $ \s -> (s, mempty, v)
+    Put f <*> Put v = Put $ \s ->
         let
-            (Put (bb, b)) = f a
+            (s1, fb, f1) = f s
+            (s2, vb, v1) = v s1
         in
-            Put (ba <> bb, b)
+            (s2, fb <> vb, f1 v1)
 
-write:: ByteString -> Put ()
-write bs = Put (LenBuilder (byteString bs, length bs), ())
+instance Monad (Put s) where
+    Put a >>= f = Put $ \s ->
+        let
+            (s1, ab, a1) = a s
+            (Put ff) = f a1
+            (s2, bb, b) = ff s1
+        in
+            (s2, ab <> bb, b)
 
-writeLazy:: LBS.ByteString -> Put ()
-writeLazy bs = Put (LenBuilder (lazyByteString bs, fromEnum $ LBS.length bs), ())
+write:: ByteString -> Put s ()
+write bs = Put $ \ s -> (s, LenBuilder (byteString bs, length bs), ())
 
-w8 :: Word8 -> Put ()
+writeLazy:: LBS.ByteString -> Put s ()
+writeLazy bs = Put $ \s -> (s, LenBuilder (lazyByteString bs, fromEnum $ LBS.length bs), ())
+
+w8 :: Word8 -> Put s ()
 w8 = write . singleton
 
-getLen:: Put a -> Int
-getLen (Put (lb, _)) = lbLen lb
+prefix :: (Int -> Put s ()) -> Put s () ->  Put s ()
+prefix hdr body = Put $ \s ->
+    let
+        (s1, bb, _) = runPut body s
+        (s2, hb, _) = runPut (hdr . lbLen $ bb) s1
+    in
+        (s2, hb <> bb, ())
 
-putInt:: Int -> Put ()
+-- !!! this broken !!!
+-- getLen:: Put s a -> Int
+-- getLen (Put (lb, _)) = lbLen lb
+
+putInt:: Int -> Put s ()
 putInt i = write . pack $ go (i `shiftR` 8) [fromIntegral (i .&. 0xff)]
     where
         go 0 acc = acc
         go v acc = go (v `shiftR` 8) (fromIntegral (v .&. 0xff) : acc)
 
-putVarUInt:: Int -> Put ()
+putVarUInt:: Int -> Put s ()
 putVarUInt i = write . pack $ go0 i
     where
         go0:: Int -> [Word8]
