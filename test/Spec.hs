@@ -4,11 +4,21 @@ import Data.ByteString.Builder (Builder, toLazyByteString, lazyByteString)
 import Data.Text (Text)
 import Test.Hspec
 
-import Data.Ion.Encoder
+import Data.Ion.SymTable (SymTable, sysTable, shared, intern)
+import Data.Ion.Encoder hiding (intern)
 import Data.Ion.Put (runPut, lbBuilder, putVarUInt)
 
-runP :: Put -> Builder
-runP p = let (_, lb, _) = runPut p () in lbBuilder lb
+
+baseSyms:: [Text]
+baseSyms = ["$10", "one", "two"]
+
+baseTable:: SymTable
+baseTable = shared baseSyms sysTable
+
+runP :: Put () -> Builder
+runP p = lbBuilder lb
+    where
+        (_, lb, _) = runPut p baseTable
 
 shouldEncodeTo:: ToIon a => a -> LBS.ByteString -> Expectation
 shouldEncodeTo v expected = (toLazyByteString . runP . encode) v `shouldBe` expected
@@ -19,6 +29,9 @@ shouldVarUInt v expected = (toLazyByteString . runP . putVarUInt) v `shouldBe` e
 main :: IO ()
 main = hspec $ do
     describe "encoders" $ do
+        describe "baseTable" $ do
+            it "resolves to {$10:10, one:11, two:12}" $
+                map (\k -> fst $ intern k baseTable) baseSyms `shouldBe` [10, 11, 12]
         describe "varUInt" $ do
             it "zero" $
                 0 `shouldVarUInt` "\x80"
@@ -98,17 +111,17 @@ main = hspec $ do
 
         describe "annotation" $ do
             it "single" $
-                Annotation [Sym 17] True `shouldEncodeTo` "\xE3\x81\x91\x11"
+                Annotation [Symbol "one"] True `shouldEncodeTo` "\xE3\x81\x8B\x11"
             it "pair of annotations for list of int" $
                 let
-                    dat = [1, 2, 3, 4, 5]::[Int]
-                    datLen = 1 + 5*2
-                    anSyms = [Sym 6, Sym 403]
-                    annotLen = 1+2
+                    dat = [1, 2, 3, 4, 5, 6]::[Int]
+                    datLen = 1 + 6*2 -- 13
+                    anSyms = [Symbol "$10", Symbol "two"]
+                    annotLen = 1+1 -- 2
                     -- fullLen = 1 + annotLen + datLen
-                    fullLen = 14
+                    fullLen = 1 + 2 + 13 -- 16
                     -- expected = toLazyByteString $ lazyByteString "\xEE\x8F\x83" <> foldMap (varUInt . fromEnum) anSyms <> encode dat
-                    expected = toLazyByteString $ lazyByteString "\xEE\x8F\x83" <> foldMap (runP . putVarUInt . fromEnum) anSyms <> runP (encode dat)
+                    expected = toLazyByteString $ lazyByteString "\xEE\x90\x82" <> foldMap (runP . putVarUInt ) [10, 12] <> runP (encode dat)
                 in
                     Annotation anSyms dat `shouldEncodeTo` expected
 
@@ -122,15 +135,15 @@ main = hspec $ do
             it "empty Struct" $
                 Struct [] `shouldEncodeTo` "\xD0"
 
-            it "struct with int and bool" $
+            it "{one: 64, two: False}" $
                 let
-                    f1 = (Sym 0x21, proxy (0x40::Int)) -- "\xA1\x21\x40"
-                    f2 = (Sym 0x22, proxy False) -- "\xA2\x10"
+                    f1 = (Symbol "one", proxy (0x40::Int)) -- "\x8B\x21\x40"
+                    f2 = (Symbol "two", proxy False) -- "\x8C\x10"
                 in
-                    Struct [f1, f2] `shouldEncodeTo` "\xD5\xA1\x21\x40\xA2\x10"
+                    Struct [f1, f2] `shouldEncodeTo` "\xD5\x8B\x21\x40\x8C\x10"
 
-            it "{$33: [True]}" $
+            it "{$10: [True]}" $
                 let
-                    f1 = (Sym 0x21, proxy [True]) -- "\xA1\xB1\x11"
+                    f1 = (Symbol "$10", proxy [True]) -- "\x8A\xB1\x11"
                 in
-                    Struct [f1] `shouldEncodeTo` "\xD3\xA1\xB1\x11"
+                    Struct [f1] `shouldEncodeTo` "\xD3\x8A\xB1\x11"

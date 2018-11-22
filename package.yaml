@@ -24,6 +24,7 @@ dependencies:
 - bytestring
 - text
 - hspec
+- containers
 
 library:
   source-dirs: src

@@ -51,8 +51,14 @@ instance Monad (Put s) where
         in
             (s2, ab <> bb, b)
 
+getState:: Put s s
+getState = Put $ \s -> (s, mempty, s)
+
+putState:: s -> Put s ()
+putState s = Put $ \_ -> (s, mempty, ())
+
 write:: ByteString -> Put s ()
-write bs = Put $ \ s -> (s, LenBuilder (byteString bs, length bs), ())
+write bs = Put $ \s -> (s, LenBuilder (byteString bs, length bs), ())
 
 writeLazy:: LBS.ByteString -> Put s ()
 writeLazy bs = Put $ \s -> (s, LenBuilder (lazyByteString bs, fromEnum $ LBS.length bs), ())
