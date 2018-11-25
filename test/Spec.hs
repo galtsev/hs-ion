@@ -6,7 +6,7 @@ import Test.Hspec
 
 import Data.Ion.SymTable (SymTable, sysTable, shared, intern)
 import Data.Ion.Encoder hiding (intern)
-import Data.Ion.Put (runPut, lbBuilder, putVarUInt)
+import Data.Ion.Put (runPut, lbBuilder, write)
 
 
 baseSyms:: [Text]
@@ -15,16 +15,16 @@ baseSyms = ["$10", "one", "two"]
 baseTable:: SymTable
 baseTable = shared baseSyms sysTable
 
-runP :: Put () -> Builder
-runP p = lbBuilder lb
+runP :: Put () -> LBS.ByteString
+runP p = toLazyByteString (lbBuilder lb)
     where
         (_, lb, _) = runPut p baseTable
 
 shouldEncodeTo:: ToIon a => a -> LBS.ByteString -> Expectation
-shouldEncodeTo v expected = (toLazyByteString . runP . encode) v `shouldBe` expected
+shouldEncodeTo v expected = runP (encode v) `shouldBe` expected
 
 shouldVarUInt:: Int -> LBS.ByteString -> Expectation
-shouldVarUInt v expected = (toLazyByteString . runP . putVarUInt) v `shouldBe` expected
+shouldVarUInt v expected = runP (putVarUInt v) `shouldBe` expected
 
 main :: IO ()
 main = hspec $ do
@@ -120,8 +120,7 @@ main = hspec $ do
                     annotLen = 1+1 -- 2
                     -- fullLen = 1 + annotLen + datLen
                     fullLen = 1 + 2 + 13 -- 16
-                    -- expected = toLazyByteString $ lazyByteString "\xEE\x8F\x83" <> foldMap (varUInt . fromEnum) anSyms <> encode dat
-                    expected = toLazyByteString $ lazyByteString "\xEE\x90\x82" <> foldMap (runP . putVarUInt ) [10, 12] <> runP (encode dat)
+                    expected = runP $ write "\xEE\x90\x82" >> mapM_ putVarUInt [10, 12] >> encode dat
                 in
                     Annotation anSyms dat `shouldEncodeTo` expected
 

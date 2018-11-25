@@ -21,6 +21,22 @@ type Put = PutS.Put SymT.SymTable
 ivm:: Put ()
 ivm = write "\xE0\x01\x00\xEA"
 
+putInt:: Int -> Put ()
+putInt i = write . pack $ go (i `shiftR` 8) [fromIntegral (i .&. 0xff)]
+    where
+        go 0 acc = acc
+        go v acc = go (v `shiftR` 8) (fromIntegral (v .&. 0xff) : acc)
+
+putVarUInt:: Int -> Put ()
+putVarUInt i = write . pack $ go0 i
+    where
+        go0:: Int -> [Word8]
+        go0 i = if i<0x80 
+            then [fromIntegral i .|. 0x80]
+            else go (i `shiftR` 7) [fromIntegral (i .&. 0x7f) .|. 0x80]
+        go:: Int -> [Word8] -> [Word8]
+        go 0 acc = acc
+        go v acc = go (v `shiftR` 7) (fromIntegral (v .&. 0x7f) : acc)
 
 class ToIon a where
     encode :: a -> Put ()

@@ -4,7 +4,7 @@ import Prelude hiding (length)
 import Data.Word
 import Data.Bits
 import qualified Data.ByteString.Lazy as LBS
-import Data.ByteString (ByteString, pack, length, singleton)
+import Data.ByteString (ByteString, length, singleton)
 import Data.ByteString.Builder (Builder, byteString, lazyByteString)
 
 newtype LenBuilder = LenBuilder (Builder, Int)
@@ -25,9 +25,6 @@ newtype Put s a = Put (s -> (s, LenBuilder, a))
 
 runPut::Put s a -> s -> (s, LenBuilder, a)
 runPut (Put p) s = p s
-
--- runPut:: Put a -> (Builder, a)
--- runPut (Put x) = x
 
 instance Functor (Put s) where
     fmap f (Put g) = Put $ \s -> 
@@ -74,23 +71,3 @@ prefix hdr body = Put $ \s ->
     in
         (s2, hb <> bb, ())
 
--- !!! this broken !!!
--- getLen:: Put s a -> Int
--- getLen (Put (lb, _)) = lbLen lb
-
-putInt:: Int -> Put s ()
-putInt i = write . pack $ go (i `shiftR` 8) [fromIntegral (i .&. 0xff)]
-    where
-        go 0 acc = acc
-        go v acc = go (v `shiftR` 8) (fromIntegral (v .&. 0xff) : acc)
-
-putVarUInt:: Int -> Put s ()
-putVarUInt i = write . pack $ go0 i
-    where
-        go0:: Int -> [Word8]
-        go0 i = if i<0x80 
-            then [fromIntegral i .|. 0x80]
-            else go (i `shiftR` 7) [fromIntegral (i .&. 0x7f) .|. 0x80]
-        go:: Int -> [Word8] -> [Word8]
-        go 0 acc = acc
-        go v acc = go (v `shiftR` 7) (fromIntegral (v .&. 0x7f) : acc)
