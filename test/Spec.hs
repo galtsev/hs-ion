@@ -16,16 +16,22 @@ baseSyms = ["$10", "one", "two"]
 baseTable:: SymTable
 baseTable = shared baseSyms sysTable
 
-runP :: Put () -> LBS.ByteString
-runP p = toLazyByteString . lbBuilder . t3_2 $ PutS.runPut p baseTable
+runP :: SymTable -> Put () -> LBS.ByteString
+runP tbl = toLazyByteString . lbBuilder . t3_2 . PutS.runPut tbl
     where
         t3_2 (_,x,_) = x
 
 shouldEncodeTo:: ToIon a => a -> LBS.ByteString -> Expectation
-shouldEncodeTo v expected = runP (encode v) `shouldBe` expected
+shouldEncodeTo v expected = runP baseTable (encode v) `shouldBe` expected
 
 shouldVarUInt:: Int -> LBS.ByteString -> Expectation
-shouldVarUInt v expected = runP (putVarUInt v) `shouldBe` expected
+shouldVarUInt v expected = runP baseTable (putVarUInt v) `shouldBe` expected
+
+shouldFlushTo :: ToIon a => a -> LBS.ByteString -> Expectation
+shouldFlushTo a expected = (toLazyByteString . snd) b `shouldBe` expected
+    where
+        b = runPut sysTable . encode $ a
+
 
 main :: IO ()
 main = hspec $ do
@@ -121,7 +127,7 @@ main = hspec $ do
                     annotLen = 1+1 -- 2
                     -- fullLen = 1 + annotLen + datLen
                     fullLen = 1 + 2 + 13 -- 16
-                    expected = runP $ write "\xEE\x90\x82" >> mapM_ putVarUInt [10, 12] >> encode dat
+                    expected = runP baseTable $ write "\xEE\x90\x82" >> mapM_ putVarUInt [10, 12] >> encode dat
                 in
                     Annotation anSyms dat `shouldEncodeTo` expected
 
@@ -147,3 +153,14 @@ main = hspec $ do
                     f1 = ("$10", proxy [True]) -- "\x8A\xB1\x11"
                 in
                     Struct [f1] `shouldEncodeTo` "\xD3\x8A\xB1\x11"
+
+        describe "local symbol table" $ do
+            it "no local symtable if no symbols in input" $
+                (12::Int) `shouldFlushTo` "\x21\x0C"
+            it "one local symbol - create local sym table" $
+                let
+                    symTbl = runP sysTable $ encode $ Annotation ["$ion_symbol_table"] $ Struct
+                        [("imports", proxy (Symbol "$ion_symbol_table")), ("symbols", proxy ["ab"::Text])]
+                    body = runP (shared ["ab"] sysTable) . encode . Symbol $ "ab"
+                in
+                    Symbol "ab" `shouldFlushTo` (symTbl <> body)

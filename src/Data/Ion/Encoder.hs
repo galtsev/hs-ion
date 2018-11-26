@@ -129,17 +129,17 @@ instance ToIon IonList where
 
 --
 
-runPut:: Put () -> SymT.SymTable -> (SymT.SymTable, Builder)
-runPut p tbl = (flushedSymTable, encodeSyms dirty <> lbBuilder lb)
+runPut:: SymT.SymTable -> Put () -> (SymT.SymTable, Builder)
+runPut tbl p = (flushedSymTable, encodeSyms dirty <> lbBuilder lb)
     where
-        (s, lb, _) = PutS.runPut p tbl
+        (s, lb, _) = PutS.runPut tbl p
         (flushedSymTable, dirty) = SymT.flush s
         encodeSyms :: [Text] -> Builder
         encodeSyms [] = mempty
         encodeSyms syms = lbBuilder lbs
             where
-                (_, lbs, _) = PutS.runPut (encode stPut) SymT.sysTable
+                (_, lbs, _) = PutS.runPut SymT.sysTable $ encode stPut
                 stPut = Annotation ["$ion_symbol_table"] $ Struct
-                    -- [ ("imports", proxy (Symbol "$ion_symbol_table"))
-                    [ ("symbols", proxy syms)
+                    [ ("imports", proxy (Symbol "$ion_symbol_table"))
+                    , ("symbols", proxy syms)
                     ]

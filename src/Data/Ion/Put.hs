@@ -23,8 +23,8 @@ lbBuilder (LenBuilder (b,_)) = b
 
 newtype Put s a = Put (s -> (s, LenBuilder, a))
 
-runPut::Put s a -> s -> (s, LenBuilder, a)
-runPut (Put p) s = p s
+runPut:: s -> Put s a -> (s, LenBuilder, a)
+runPut s (Put p) = p s
 
 instance Functor (Put s) where
     fmap f (Put g) = Put $ \s -> 
@@ -66,8 +66,8 @@ w8 = write . singleton
 prefix :: (Int -> Put s ()) -> Put s () ->  Put s ()
 prefix hdr body = Put $ \s ->
     let
-        (s1, bb, _) = runPut body s
-        (s2, hb, _) = runPut (hdr . lbLen $ bb) s1
+        (s1, bb, _) = runPut s body
+        (s2, hb, _) = runPut s1 . hdr . lbLen $ bb
     in
         (s2, hb <> bb, ())
 
