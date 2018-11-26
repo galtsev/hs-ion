@@ -12,7 +12,7 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import Control.Monad ((>=>))
 
-import Data.Ion.Put hiding (Put)
+import Data.Ion.Put hiding (Put, runPut)
 import qualified Data.Ion.Put as PutS
 import qualified Data.Ion.SymTable as SymT
 
@@ -125,3 +125,21 @@ newtype IonList = IonList [IonProxy]
 
 instance ToIon IonList where
     encode (IonList items) = tagged 0xB0 $ mapM_ runProxy items
+
+
+--
+
+runPut:: Put () -> SymT.SymTable -> (SymT.SymTable, Builder)
+runPut p tbl = (flushedSymTable, encodeSyms dirty <> lbBuilder lb)
+    where
+        (s, lb, _) = PutS.runPut p tbl
+        (flushedSymTable, dirty) = SymT.flush s
+        encodeSyms :: [Text] -> Builder
+        encodeSyms [] = mempty
+        encodeSyms syms = lbBuilder lbs
+            where
+                (_, lbs, _) = PutS.runPut (encode stPut) SymT.sysTable
+                stPut = Annotation ["$ion_symbol_table"] $ Struct
+                    -- [ ("imports", proxy (Symbol "$ion_symbol_table"))
+                    [ ("symbols", proxy syms)
+                    ]

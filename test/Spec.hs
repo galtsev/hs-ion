@@ -6,7 +6,8 @@ import Test.Hspec
 
 import Data.Ion.SymTable (SymTable, sysTable, shared, intern)
 import Data.Ion.Encoder hiding (intern)
-import Data.Ion.Put (runPut, lbBuilder, write)
+import Data.Ion.Put (lbBuilder, write)
+import qualified Data.Ion.Put as PutS
 
 
 baseSyms:: [Text]
@@ -16,9 +17,9 @@ baseTable:: SymTable
 baseTable = shared baseSyms sysTable
 
 runP :: Put () -> LBS.ByteString
-runP p = toLazyByteString (lbBuilder lb)
+runP p = toLazyByteString . lbBuilder . t3_2 $ PutS.runPut p baseTable
     where
-        (_, lb, _) = runPut p baseTable
+        t3_2 (_,x,_) = x
 
 shouldEncodeTo:: ToIon a => a -> LBS.ByteString -> Expectation
 shouldEncodeTo v expected = runP (encode v) `shouldBe` expected
